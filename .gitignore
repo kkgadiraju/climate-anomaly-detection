@@ -129,4 +129,7 @@ dmypy.json
 .pyre/
 
 # data
-data/
+data/*.mat
+data/*.zip
+data/*.nc
+data/mat/

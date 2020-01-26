@@ -7,7 +7,7 @@
 import shutil
 import urllib.request as request
 from contextlib import closing
-for i in range(1979,1990):
+for i in range(1979,2014):
     path = "ftp://ftp.cdc.noaa.gov/Datasets/ncep.reanalysis2.dailyavgs/gaussian_grid/air.2m.gauss."+str(i)+".nc"
     print(f'Downloading {path}')
     with closing(request.urlopen(path)) as r:

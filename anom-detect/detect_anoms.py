@@ -3,18 +3,19 @@
 # Plotting reference: http://earthpy.org/05_Graphs_and_maps_Matplotlib_and_Basemap.html
 #############
 
-
-from scipy.io import loadmat
+import scipy as sp
 import scipy.stats as st
 import netCDF4
 import os, glob, sys
 import numpy as np
 #from matplotlib.mlab import griddata
 import matplotlib.pyplot as plt
+plt.rcParams["figure.figsize"] = (20,10)
 from mpl_toolkits.basemap import Basemap
 from matplotlib import colors
+#colors.DivergingNorm(vmin=-40., vcenter=0., vmax=40.)
 
-def load_data(start_year, end_year):
+def load_data(folder_name, start_year, end_year):
     """
     Load data stored in data folder in specified range
     
@@ -38,23 +39,17 @@ def load_data(start_year, end_year):
     numpy.ndarray: A floating point array containing the information for all the years under consideration. Of the format (end_year - start_year +_ 1) * 365 * 10512
 
     """
-    mat_folder_name = '../data/'
-    csv_folder_name = '../data/csv/'
 
-    #all_mat_files = glob.glob(os.path.join(mat_folder_name, '*.mat'))
+    #all_mat_files = glob.glob(os.path.join(folder_name, '*.mat'))
 
     all_data = None
 
     for year in range(start_year, end_year + 1):
-        mat_file = os.path.join(mat_folder_name, f'air.2m.gauss.{year}.nc')
+        mat_file = os.path.join(folder_name, f'air.2m.gauss.{year}.nc')
         if not os.path.exists(mat_file):
             print(f'File {mat_file} does not exists')
             sys.exit(0) 
         f = netCDF4.Dataset(f'../data/air.2m.gauss.{year}.nc')
-        #print(f.variables['air'][:].shape)
-        #print(f.variables['lat'][:].shape)
-        curr_lats = f.variables['lat'][:]
-        curr_longs = f.variables['lon'][:]                               
         # for simplicity sake, ignoring leap year last day
         curr_data = f.variables['air'][:][0:365, :, :, :]
         curr_data = curr_data.reshape((365, 94, 192)) 
@@ -64,7 +59,7 @@ def load_data(start_year, end_year):
         else:
             all_data = np.vstack((all_data, curr_data))
     print('Finished loading data into memory...')
-    return [all_data, curr_lats, curr_longs]
+    return all_data
 
 
 def calculate_five_day_window(all_data, day_number):
@@ -72,29 +67,61 @@ def calculate_five_day_window(all_data, day_number):
     Generate 5 day windows necessary to calculate long term means
 
     """
-    curr_window = all_data[:, day_number-2: day_number+3, :, :] 
-    curr_window = curr_window.reshape(curr_window.shape[0] * curr_window.shape[1], curr_window.shape[2], curr_window.shape[3])
+    curr_window = all_data[:, day_number-2: day_number+3, :, :] # (35, 5, 94, 192)
+    curr_window = curr_window.reshape(curr_window.shape[0] * curr_window.shape[1], curr_window.shape[2], curr_window.shape[3]) # (175, 94, 192)
+    #plot_data(curr_window[0, :, :], 'coolwarm')
+    
     return curr_window    
 
 
-def plot_data(data, cmap):
+def plot_data(data, cmap, title, norm=None):
+
+    plt.clf()
+    plt.cla() 
+    
     m = Basemap(projection='cyl', llcrnrlat=-90,urcrnrlat=90,\
             llcrnrlon=0,urcrnrlon=360,resolution='c')#Basemap(resolution='l')
     m.drawcoastlines()
-    img = m.imshow(np.flip(data, 0), interpolation='None', cmap=cmap)
+    if norm is not None:
+        img = m.imshow(np.flip(data, 0), interpolation='None', cmap=cmap, norm=norm)
+    else:
+        img = m.imshow(np.flip(data, 0), interpolation='None', cmap=cmap) 
     m.colorbar(img)
-    plt.show() 
+    #plt.show() 
+    #plt.savefig(f'./{i}.png')
+    plt.title(title)
+    plt.show()
+    
+
+def plot_heatmap(data, day_number, year_number):
+    day = data[year_number, day_number, :, :]
+    plot_data(day, 'coolwarm', 'Surface Temperature Heat Map') 
+    
+
+def plot_anomalies(data, day_number, year_number):
+    # Reference: https://matplotlib.org/3.1.1/gallery/userdemo/colormap_normalizations_custom.html
+    class MidpointNormalize(colors.Normalize):
+        def __init__(self, vmin=None, vmax=None, midpoint=None, clip=False):
+            self.midpoint = midpoint
+            colors.Normalize.__init__(self, vmin, vmax, clip)
+
+        def __call__(self, value, clip=None):
+            # I'm ignoring masked values and all kinds of edge cases to make a
+            # simple example...
+            x, y = [self.vmin, self.midpoint, self.vmax], [0, 0.5, 1]
+            return np.ma.masked_array(np.interp(value, x, y))
+    norm=MidpointNormalize(midpoint=0.)
+    plot_data(data, 'coolwarm', f'Anomalies for day#{day_number} in year#{year_number}', norm)
 
 
-def detect_anomalies(all_data, day_number, year_number, percentile, longs, lats):
+def detect_anomalies(all_data, day_number, year_number, percentile):
     """
 
     """
-    curr_long_term_window = calculate_five_day_window(all_data, day_number)
-    curr_long_term_mean = np.mean(curr_long_term_window, axis = 0)
-    curr_long_term_std = np.std(curr_long_term_window, axis = 0)
+    curr_long_term_window = calculate_five_day_window(all_data, day_number) # 175 * 94 * 192 (35 years,5 days per year) 
+    curr_long_term_mean = np.mean(curr_long_term_window, axis = 0) # 94 * 192
+    curr_long_term_std = np.std(curr_long_term_window, axis = 0) # 94 * 192
     z_score = st.norm.ppf(percentile)
-    #print(f'Zscore for {percentile} percentile is {z_score}')
     max_lim = curr_long_term_mean + z_score * curr_long_term_std
     min_lim = curr_long_term_mean - z_score * curr_long_term_std
     #print(curr_long_term_mean, curr_long_term_std, max_lim, min_lim)
@@ -103,26 +130,15 @@ def detect_anomalies(all_data, day_number, year_number, percentile, longs, lats)
     heat_anomaly_mask = (curr_day > max_lim)
     cold_anomaly_mask = (curr_day < min_lim)
     final_mask = np.zeros(heat_anomaly_mask.shape)
-    final_mask[heat_anomaly_mask] = 1
-    final_mask[cold_anomaly_mask] = -1
-    print(f'Number of hot anomalies = {np.sum(heat_anomaly_mask)}, cold anomalies = {np.sum(cold_anomaly_mask)}') 
-    cmap = colors.ListedColormap(['blue', 'white', 'red'])
-    plot_data(final_mask, cmap)
-    '''
-    m = Basemap(projection='cyl', llcrnrlat=-90,urcrnrlat=90,\
-            llcrnrlon=0,urcrnrlon=360,resolution='c')#Basemap(resolution='l')
-    #X,Y = m(lons2, lats2)
-    #m.drawcountries()
-    m.drawcoastlines()
-    #m.contourf(X, Y, final_mask)
-    img = m.imshow(final_mask, interpolation='None')#, cmap=cmap)
-    m.colorbar(img)
-    plt.show() 
-    '''         
+    anomaly_score = curr_day - curr_long_term_mean
+    final_mask[heat_anomaly_mask] = anomaly_score[heat_anomaly_mask]
+    final_mask[cold_anomaly_mask] = anomaly_score[cold_anomaly_mask]
+    #print(f'Number of hot anomalies = {np.sum(heat_anomaly_mask)}, cold anomalies = {np.sum(cold_anomaly_mask)}') 
+    #cmap = colors.ListedColormap(['blue', 'white', 'red'])
+    plot_anomalies(final_mask, day_number, year_number)
 
 if __name__=="__main__":
-    all_data, lats, longs = load_data(1979, 2013)
-    print(all_data.shape, lats.shape, longs.shape)
-    detect_anomalies(all_data, 204, 14, 0.95, longs, lats)
-    #plot_data(all_data[13, 204, :, :], 'Reds') 
-    #print(np.min(lats), np.max(lats), np.min(longs), np.max(longs))
+    all_data = load_data('../data/', 1979, 2013) # n_years * 365 * 94 * 192
+    for i in range(193, 203):
+        detect_anomalies(all_data, i, 31, 0.99)
+    plot_heatmap(all_data, 200, 24)

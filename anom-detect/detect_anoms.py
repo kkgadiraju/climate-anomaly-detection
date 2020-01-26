@@ -2,6 +2,8 @@
 # Data is in matlab matrices format, load it into memory as numpy array
 # Plotting reference: http://earthpy.org/05_Graphs_and_maps_Matplotlib_and_Basemap.html
 #############
+
+
 from scipy.io import loadmat
 import scipy.stats as st
 import netCDF4
@@ -84,7 +86,7 @@ def plot_data(data, cmap):
     plt.show() 
 
 
-def calculate_anomaly_score(all_data, day_number, year_number, percentile, longs, lats):
+def detect_anomalies(all_data, day_number, year_number, percentile, longs, lats):
     """
 
     """
@@ -119,8 +121,8 @@ def calculate_anomaly_score(all_data, day_number, year_number, percentile, longs
     '''         
 
 if __name__=="__main__":
-    all_data, lats, longs = load_data(1990, 2019)
+    all_data, lats, longs = load_data(1979, 2013)
     print(all_data.shape, lats.shape, longs.shape)
-    calculate_anomaly_score(all_data, 204, 14, 0.95, longs, lats)
+    detect_anomalies(all_data, 204, 14, 0.95, longs, lats)
     #plot_data(all_data[13, 204, :, :], 'Reds') 
     #print(np.min(lats), np.max(lats), np.min(longs), np.max(longs))

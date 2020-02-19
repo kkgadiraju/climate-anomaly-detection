@@ -14,7 +14,8 @@ Please read the following paper for more information:
 }
 ```
 
-* Note: The code is only for the anomaly detection part
+* ***Note 1***: The code is only for the anomaly detection part
+* ***Note 2***: This code makes some assumptions. Such as it ignores leap year day in every leap year to make the computations simpler.
 
 ### How to run?
 * Step-0: Verify you have all the necessary python packages installed. First install anaconda, followed by using the below commands to first create the conda environment necessary for this project as well as activate it.

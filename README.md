@@ -1,4 +1,4 @@
-# climate-anomaly-detection
+# A simple statistical method for anomaly detection in Gridded Temperature (NCEP-2) data
 Detect anomalies in gridded climate data using domain method
 
 Please read the following paper for more information: 
